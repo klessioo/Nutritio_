@@ -2,28 +2,25 @@ import { useState } from 'react';
 import { AboutSection } from './components/about-section';
 import { GamesDashboard } from './components/games-dashboard';
 import { LoginModal } from './components/login-modal';
-import { AvatarConfig, AvatarDisplay } from './components/avatar-creator';
+import { AvatarDisplay } from './components/avatar-creator';
+import { SessionProvider, useSession } from './lib/session-context';
+import { DEFAULT_AVATAR } from './lib/pixel-avatar';
 import { Apple, Gamepad2, LogOut } from 'lucide-react';
 
-export default function App() {
+function AppShell() {
+  const { status, profile, logout } = useSession();
   const [activeTab, setActiveTab] = useState<'about' | 'games'>('about');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [userName, setUserName] = useState('');
-  const [userAvatar, setUserAvatar] = useState<AvatarConfig | undefined>(undefined);
 
-  const handleLoginSuccess = (name: string, avatar?: AvatarConfig) => {
-    setIsLoggedIn(true);
-    setUserName(name);
-    setUserAvatar(avatar);
+  const isLoggedIn = !!profile;
+
+  const handleLoginSuccess = () => {
     setShowLoginModal(false);
     setActiveTab('games');
   };
 
   const handleLogout = () => {
-    setIsLoggedIn(false);
-    setUserName('');
-    setUserAvatar(undefined);
+    logout();
     setActiveTab('about');
   };
 
@@ -34,6 +31,17 @@ export default function App() {
       setActiveTab('games');
     }
   };
+
+  if (status === 'loading') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-orange-50 to-yellow-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-6xl mb-4 animate-bounce">🍎</div>
+          <p className="text-gray-600 font-semibold">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-orange-50 to-yellow-50">
@@ -78,15 +86,13 @@ export default function App() {
             </nav>
 
             {/* User Info */}
-            {isLoggedIn && (
+            {isLoggedIn && profile && (
               <div className="flex items-center gap-3">
-                {userAvatar && (
-                  <div className="w-12 h-12 rounded-full overflow-hidden shadow-lg border-2 border-purple-300">
-                    <AvatarDisplay config={userAvatar} size={48} />
-                  </div>
-                )}
+                <div className="w-12 h-12 rounded-full overflow-hidden shadow-lg border-2 border-purple-300">
+                  <AvatarDisplay config={profile.avatarConfig ?? DEFAULT_AVATAR} size={48} />
+                </div>
                 <div className="text-right">
-                  <p className="text-sm font-semibold text-gray-700">Olá, {userName}!</p>
+                  <p className="text-sm font-semibold text-gray-700">Olá, {profile.username}!</p>
                   <p className="text-xs text-gray-500">Caxias-MA</p>
                 </div>
                 <button
@@ -104,15 +110,12 @@ export default function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'about' ? <AboutSection /> : <GamesDashboard userName={userName} userAvatar={userAvatar} />}
+        {activeTab === 'about' || !profile ? <AboutSection /> : <GamesDashboard />}
       </main>
 
       {/* Login Modal */}
       {showLoginModal && (
-        <LoginModal
-          onClose={() => setShowLoginModal(false)}
-          onLoginSuccess={handleLoginSuccess}
-        />
+        <LoginModal onClose={() => setShowLoginModal(false)} onLoginSuccess={handleLoginSuccess} />
       )}
 
       {/* Footer */}
@@ -124,5 +127,13 @@ export default function App() {
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <SessionProvider>
+      <AppShell />
+    </SessionProvider>
   );
 }

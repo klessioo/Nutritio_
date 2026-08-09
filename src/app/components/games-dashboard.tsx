@@ -1,13 +1,11 @@
 import { GameCard } from './game-card';
-import { Trophy, Star, Heart, Zap } from 'lucide-react';
+import { Trophy, Star, Heart, Zap, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { GameModal } from './game-modal';
-import { AvatarConfig, AvatarDisplay } from './avatar-creator';
-
-interface GamesDashboardProps {
-  userName: string;
-  userAvatar?: AvatarConfig;
-}
+import { AvatarDisplay } from './avatar-creator';
+import { AvatarEditorModal } from './avatar-editor-modal';
+import { useSession } from '../lib/session-context';
+import { DEFAULT_AVATAR } from '../lib/pixel-avatar';
 
 const games = [
   {
@@ -90,9 +88,43 @@ const games = [
     borderColor: 'border-teal-200',
     image: 'https://images.unsplash.com/photo-1656711843820-f352e49714ff?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjaGVmJTIwY29va2luZyUyMGhlYWx0aHklMjBmb29kfGVufDF8fHx8MTc2ODkyMzY4MHww&ixlib=rb-4.1.0&q=80&w=1080',
   },
+  {
+    id: 9,
+    title: 'Corrida das Frutas',
+    description: 'Desvie das besteiras e colete frutas na pista!',
+    icon: '🏎️',
+    color: 'from-red-400 to-orange-500',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    image: 'https://images.unsplash.com/photo-1610725664285-7c57e6eeac3f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmcnVpdCUyMHJhY2UlMjBjb2xvcmZ1bHxlbnwxfHx8fDE3Njg5MjM2ODB8MA&ixlib=rb-4.1.0&q=80&w=1080',
+  },
+  {
+    id: 10,
+    title: 'Memória Nutritiva',
+    description: 'Combine alimentos com seus benefícios nutricionais!',
+    icon: '🧠',
+    color: 'from-indigo-400 to-indigo-600',
+    bgColor: 'bg-indigo-50',
+    borderColor: 'border-indigo-200',
+    image: 'https://images.unsplash.com/photo-1490645935967-10de6ba17061?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtZW1vcnklMjBnYW1lJTIwY2FyZHN8ZW58MXx8fHwxNzY4OTIzNjgwfDA&ixlib=rb-4.1.0&q=80&w=1080',
+  },
 ];
 
-export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
+export function GamesDashboard() {
+  const { profile, progress } = useSession();
+  const userName = profile?.username ?? '';
+  const userAvatar = profile?.avatarConfig ?? DEFAULT_AVATAR;
+
+  const progressEntries = Object.values(progress);
+  const totalPoints = progressEntries.reduce((sum, p) => sum + p.bestScore, 0);
+  const totalStars = progressEntries.reduce((sum, p) => sum + p.stars, 0);
+  const completedCount = progressEntries.filter((p) => p.completed).length;
+  const perfectCount = progressEntries.filter((p) => p.stars === 3).length;
+  const evolutionPct = Math.round((completedCount / games.length) * 100);
+  const xp = totalStars * 20;
+  const level = Math.floor(xp / 100) + 1;
+  const xpInLevel = xp % 100;
+
   const [selectedGame, setSelectedGame] = useState<{
     id: number;
     title: string;
@@ -100,6 +132,7 @@ export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
     icon: string;
     color: string;
   } | null>(null);
+  const [showAvatarEditor, setShowAvatarEditor] = useState(false);
 
   const handlePlayGame = (game: { id: number; title: string; description: string; icon: string; color: string }) => {
     setSelectedGame(game);
@@ -112,14 +145,21 @@ export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Player Profile Card with Avatar and Stamina */}
-      {userAvatar && (
+      {profile && (
         <div className="bg-white rounded-3xl p-6 shadow-xl border-4 border-purple-200">
           <div className="flex items-center gap-6">
             {/* Avatar Display */}
-            <div className="flex-shrink-0">
+            <div className="flex-shrink-0 relative">
               <div className="w-32 h-32 rounded-full overflow-hidden shadow-lg border-4 border-purple-300 bg-gradient-to-br from-purple-100 to-pink-100">
                 <AvatarDisplay config={userAvatar} size={128} />
               </div>
+              <button
+                onClick={() => setShowAvatarEditor(true)}
+                className="absolute -bottom-1 -right-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white p-2.5 rounded-full shadow-lg hover:scale-110 transition-transform"
+                title="Editar Avatar"
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Player Info and Stats */}
@@ -179,13 +219,13 @@ export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
               <div className="w-24 h-24 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center shadow-lg border-4 border-yellow-300">
                 <div>
                   <div className="text-xs font-semibold text-white opacity-80">NÍVEL</div>
-                  <div className="text-3xl font-bold text-white">1</div>
+                  <div className="text-3xl font-bold text-white">{level}</div>
                 </div>
               </div>
               <div className="mt-2">
-                <div className="text-xs text-gray-500">XP: 0/100</div>
+                <div className="text-xs text-gray-500">XP: {xpInLevel}/100</div>
                 <div className="w-24 bg-gray-200 rounded-full h-1.5 mt-1">
-                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full" style={{ width: '0%' }}></div>
+                  <div className="bg-gradient-to-r from-purple-500 to-pink-500 h-full rounded-full" style={{ width: `${xpInLevel}%` }}></div>
                 </div>
               </div>
             </div>
@@ -210,14 +250,14 @@ export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
                 <Trophy className="w-8 h-8 text-yellow-300" />
               </div>
               <p className="text-sm font-semibold">Pontos</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{totalPoints}</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-2">
                 <Star className="w-8 h-8 text-yellow-300" />
               </div>
               <p className="text-sm font-semibold">Estrelas</p>
-              <p className="text-2xl font-bold">0</p>
+              <p className="text-2xl font-bold">{totalStars}</p>
             </div>
           </div>
         </div>
@@ -231,7 +271,7 @@ export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {games.map((game) => (
-            <GameCard key={game.id} {...game} onPlay={handlePlayGame} />
+            <GameCard key={game.id} {...game} starsEarned={progress[game.id]?.stars ?? 0} onPlay={handlePlayGame} />
           ))}
         </div>
       </div>
@@ -243,34 +283,34 @@ export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
           <div>
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-600">Jogos Completados</span>
-              <span className="font-semibold text-gray-800">0/8</span>
+              <span className="font-semibold text-gray-800">{completedCount}/{games.length}</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
               <div
                 className="bg-gradient-to-r from-green-400 to-green-600 h-full rounded-full transition-all duration-500"
-                style={{ width: '0%' }}
+                style={{ width: `${evolutionPct}%` }}
               />
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
             <div className="bg-green-50 rounded-2xl p-4 text-center border-2 border-green-200">
               <div className="text-2xl mb-1">🎯</div>
-              <div className="text-2xl font-bold text-green-700">0</div>
-              <div className="text-xs text-gray-600">Acertos</div>
+              <div className="text-2xl font-bold text-green-700">{completedCount}</div>
+              <div className="text-xs text-gray-600">Jogos Completados</div>
             </div>
             <div className="bg-blue-50 rounded-2xl p-4 text-center border-2 border-blue-200">
-              <div className="text-2xl mb-1">⏱️</div>
-              <div className="text-2xl font-bold text-blue-700">0h</div>
-              <div className="text-xs text-gray-600">Tempo Jogado</div>
+              <div className="text-2xl mb-1">⭐</div>
+              <div className="text-2xl font-bold text-blue-700">{totalStars}</div>
+              <div className="text-xs text-gray-600">Estrelas Totais</div>
             </div>
             <div className="bg-yellow-50 rounded-2xl p-4 text-center border-2 border-yellow-200">
               <div className="text-2xl mb-1">🏆</div>
-              <div className="text-2xl font-bold text-yellow-700">0</div>
+              <div className="text-2xl font-bold text-yellow-700">{perfectCount}</div>
               <div className="text-xs text-gray-600">Conquistas</div>
             </div>
             <div className="bg-purple-50 rounded-2xl p-4 text-center border-2 border-purple-200">
               <div className="text-2xl mb-1">📈</div>
-              <div className="text-2xl font-bold text-purple-700">0%</div>
+              <div className="text-2xl font-bold text-purple-700">{evolutionPct}%</div>
               <div className="text-xs text-gray-600">Evolução</div>
             </div>
           </div>
@@ -281,6 +321,9 @@ export function GamesDashboard({ userName, userAvatar }: GamesDashboardProps) {
       {selectedGame && (
         <GameModal game={selectedGame} onClose={handleCloseGame} />
       )}
+
+      {/* Avatar Editor Modal */}
+      {showAvatarEditor && <AvatarEditorModal onClose={() => setShowAvatarEditor(false)} />}
     </div>
   );
 }

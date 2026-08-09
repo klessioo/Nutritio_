@@ -10,6 +10,7 @@ interface GameCardProps {
   bgColor: string;
   borderColor: string;
   image: string;
+  starsEarned?: 0 | 1 | 2 | 3;
   onPlay: (game: { id: number; title: string; description: string; icon: string; color: string }) => void;
 }
 
@@ -20,6 +21,7 @@ export function GameCard({
   icon,
   color,
   image,
+  starsEarned = 0,
   onPlay,
 }: GameCardProps) {
   const [isHovered, setIsHovered] = useState(false);
@@ -87,7 +89,7 @@ export function GameCard({
                 key={star}
                 className="w-7 h-7 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center text-sm shadow-md"
               >
-                ⭐
+                {star <= starsEarned ? '⭐' : '☆'}
               </div>
             ))}
           </div>

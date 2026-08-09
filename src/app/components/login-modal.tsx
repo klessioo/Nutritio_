@@ -1,32 +1,26 @@
 import { useState } from 'react';
-import { X, User, Lock, Apple, UserPlus, Users } from 'lucide-react';
-import { AvatarCreator, AvatarConfig, AvatarDisplay } from './avatar-creator';
+import { X, User, Lock, Apple, UserPlus, Loader2 } from 'lucide-react';
+import { AvatarCreator, AvatarConfig } from './avatar-creator';
+import { DEFAULT_AVATAR } from '../lib/pixel-avatar';
+import { useSession } from '../lib/session-context';
 
 interface LoginModalProps {
   onClose: () => void;
-  onLoginSuccess: (name: string, avatar?: AvatarConfig) => void;
+  onLoginSuccess: () => void;
 }
 
 export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
+  const { login, register, updateAvatar } = useSession();
+
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [signupStep, setSignupStep] = useState<'info' | 'gender' | 'avatar'>('info');
-  const [selectedGender, setSelectedGender] = useState<'male' | 'female'>('male');
-  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>({
-    gender: 'male',
-    skinColor: '#FFDAB3',
-    hairType: 0,
-    hairColor: '#2C1608',
-    eyeType: 0,
-    mouthType: 0,
-    outfit: 0,
-    accessory: 5,
-    makeupType: 0,
-  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [signupStep, setSignupStep] = useState<'info' | 'avatar'>('info');
+  const [avatarConfig, setAvatarConfig] = useState<AvatarConfig>(DEFAULT_AVATAR);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
@@ -35,21 +29,28 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
       return;
     }
 
-    // Mock authentication - em produção, isso seria validado no backend
-    if (password.length < 4) {
-      setError('Senha muito curta');
-      return;
+    setIsSubmitting(true);
+    try {
+      await login(username.trim(), password);
+      onLoginSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível entrar. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
     }
-
-    onLoginSuccess(username);
   };
 
-  const handleSignupInfo = (e: React.FormEvent) => {
+  const handleSignupInfo = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
     if (!username.trim() || !password.trim()) {
       setError('Por favor, preencha todos os campos');
+      return;
+    }
+
+    if (username.trim().length < 3) {
+      setError('Nome de usuário deve ter pelo menos 3 caracteres');
       return;
     }
 
@@ -58,19 +59,28 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
       return;
     }
 
-    // Avançar para seleção de gênero
-    setSignupStep('gender');
+    setIsSubmitting(true);
+    try {
+      await register(username.trim(), password);
+      setSignupStep('avatar');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível criar sua conta. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const handleSignupGender = (gender: 'male' | 'female') => {
-    setSelectedGender(gender);
-    setAvatarConfig((prevConfig) => ({ ...prevConfig, gender }));
-    setSignupStep('avatar');
-  };
-
-  const handleSignupComplete = () => {
-    // Finalizar cadastro com avatar
-    onLoginSuccess(username, avatarConfig);
+  const handleSignupComplete = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      await updateAvatar(avatarConfig);
+      onLoginSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar seu avatar. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Renderizar modo de cadastro - etapa de informações
@@ -116,7 +126,8 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-purple-400 focus:outline-none transition-all"
+                  disabled={isSubmitting}
+                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-purple-400 focus:outline-none transition-all disabled:opacity-60"
                   placeholder="Escolha seu nome"
                 />
               </div>
@@ -135,7 +146,8 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
                   type="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-purple-400 focus:outline-none transition-all"
+                  disabled={isSubmitting}
+                  className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-purple-400 focus:outline-none transition-all disabled:opacity-60"
                   placeholder="Crie uma senha"
                 />
               </div>
@@ -145,85 +157,33 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
             {/* Next Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-4 rounded-2xl hover:shadow-lg transition-all hover:scale-105 active:scale-95"
+              disabled={isSubmitting}
+              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-4 rounded-2xl hover:shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
             >
-              Próximo: Selecionar Gênero
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Criando conta...
+                </>
+              ) : (
+                'Próximo: Criar Avatar 🎨'
+              )}
             </button>
 
             {/* Switch to Login */}
             <div className="text-center">
               <button
                 type="button"
-                onClick={() => setMode('login')}
+                onClick={() => {
+                  setMode('login');
+                  setError('');
+                }}
                 className="text-purple-600 hover:text-purple-700 font-semibold text-sm"
               >
                 Já tem uma conta? Faça login
               </button>
             </div>
           </form>
-        </div>
-      </div>
-    );
-  }
-
-  // Renderizar modo de cadastro - etapa de gênero
-  if (mode === 'signup' && signupStep === 'gender') {
-    return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
-        <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-300">
-          {/* Header */}
-          <div className="bg-gradient-to-r from-purple-500 to-pink-500 p-6 relative">
-            <button
-              onClick={onClose}
-              className="absolute top-4 right-4 p-2 bg-white/20 hover:bg-white/30 rounded-full transition-all"
-            >
-              <X className="w-5 h-5 text-white" />
-            </button>
-            <div className="flex flex-col items-center">
-              <h2 className="text-2xl font-bold text-white">Selecione o Gênero</h2>
-              <p className="text-purple-100 text-sm mt-1">Escolha o gênero do seu avatar</p>
-            </div>
-          </div>
-
-          {/* Gender Selection */}
-          <div className="p-6">
-            <div className="flex justify-around">
-              <button
-                onClick={() => handleSignupGender('male')}
-                className={`flex flex-col items-center p-4 rounded-2xl border-2 ${
-                  selectedGender === 'male' ? 'border-purple-500' : 'border-gray-200'
-                } hover:border-purple-500 transition-all`}
-              >
-                <Users className="w-10 h-10 text-gray-500" />
-                <p className="text-gray-500 mt-2">Masculino</p>
-              </button>
-              <button
-                onClick={() => handleSignupGender('female')}
-                className={`flex flex-col items-center p-4 rounded-2xl border-2 ${
-                  selectedGender === 'female' ? 'border-purple-500' : 'border-gray-200'
-                } hover:border-purple-500 transition-all`}
-              >
-                <Users className="w-10 h-10 text-gray-500" />
-                <p className="text-gray-500 mt-2">Feminino</p>
-              </button>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="bg-gray-50 px-8 py-6 flex gap-3 border-t border-gray-200">
-            <button
-              onClick={() => setSignupStep('info')}
-              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 rounded-2xl transition-all"
-            >
-              ← Voltar
-            </button>
-            <button
-              onClick={() => setSignupStep('avatar')}
-              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 rounded-2xl hover:shadow-lg transition-all hover:scale-105 active:scale-95"
-            >
-              Próximo: Criar Avatar 🎨
-            </button>
-          </div>
         </div>
       </div>
     );
@@ -244,28 +204,42 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
             </button>
             <div className="flex flex-col items-center">
               <h2 className="text-2xl font-bold text-white">Crie Seu Avatar! 🎨</h2>
-              <p className="text-purple-100 text-sm mt-1">Personalize sua aparência com roupas de comida</p>
+              <p className="text-purple-100 text-sm mt-1">Personalize seu avatar em pixel art</p>
             </div>
           </div>
 
           {/* Avatar Creator */}
           <div className="p-6 max-h-[70vh] overflow-y-auto">
+            {error && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-4 text-red-700 text-sm mb-6">
+                {error}
+              </div>
+            )}
             <AvatarCreator config={avatarConfig} onChange={setAvatarConfig} size={180} />
           </div>
 
           {/* Footer */}
           <div className="bg-gray-50 px-8 py-6 flex gap-3 border-t border-gray-200">
             <button
-              onClick={() => setSignupStep('gender')}
-              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 rounded-2xl transition-all"
+              onClick={() => setSignupStep('info')}
+              disabled={isSubmitting}
+              className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-3 rounded-2xl transition-all disabled:opacity-60"
             >
               ← Voltar
             </button>
             <button
               onClick={handleSignupComplete}
-              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 rounded-2xl hover:shadow-lg transition-all hover:scale-105 active:scale-95"
+              disabled={isSubmitting}
+              className="flex-1 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold py-3 rounded-2xl hover:shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
             >
-              Finalizar Cadastro! 🎉
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                'Finalizar Cadastro! 🎉'
+              )}
             </button>
           </div>
         </div>
@@ -315,7 +289,8 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-green-400 focus:outline-none transition-all"
+                disabled={isSubmitting}
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-green-400 focus:outline-none transition-all disabled:opacity-60"
                 placeholder="Digite seu nome"
               />
             </div>
@@ -334,7 +309,8 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-green-400 focus:outline-none transition-all"
+                disabled={isSubmitting}
+                className="w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-2xl focus:border-green-400 focus:outline-none transition-all disabled:opacity-60"
                 placeholder="Digite sua senha"
               />
             </div>
@@ -350,9 +326,17 @@ export function LoginModal({ onClose, onLoginSuccess }: LoginModalProps) {
           {/* Submit Button */}
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-orange-400 to-orange-600 text-white font-bold py-4 rounded-2xl hover:shadow-lg transition-all hover:scale-105 active:scale-95"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-orange-400 to-orange-600 text-white font-bold py-4 rounded-2xl hover:shadow-lg transition-all hover:scale-105 active:scale-95 disabled:opacity-60 disabled:hover:scale-100 flex items-center justify-center gap-2"
           >
-            Entrar e Jogar! 🎮
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                Entrando...
+              </>
+            ) : (
+              'Entrar e Jogar! 🎮'
+            )}
           </button>
 
           {/* Switch to Signup */}
